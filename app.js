@@ -10,103 +10,78 @@ var passport = require('passport');
 var LocalStrategy = require('passport-local');
 var api = require('./api');
 
-// var routes = require('./routes/index');
-// var users = require('./routes/users');
-
 var app = express();
 
-passport.use(new LocalStrategy(function(username, password, done) {
+// Configure Passport to use localStrategy
+// Query Postgres and return error or a user object
+passport.use( new LocalStrategy( function( username, password, done ) {
   api.login.read( username, password )
-  .then(function (results) {
-      done(null, results.rows[0]);
-    }).catch(function (error) {
-    done(error);
-  });
+  .then(function ( results ) {
+      // Success
+      done( null, results.rows[0] );
+    }).catch( function ( error ) {
+      // Error
+      done(error);
+    });
 }));
 
-passport.serializeUser(function (user, done) {
-  done(null, JSON.stringify(user));
+// Create the session string in the cookie
+passport.serializeUser( function ( user, done ) {
+  done( null, JSON.stringify( user ));
 });
 
-passport.deserializer(function (id, done) {
-  done(null, JSON.parse(id));
+// Client gives  server a cookie that was created with serializeUser
+// Deserialize will unencrypt the cookie string and retrieve the user
+passport.deserializer( function ( id, done ) {
+  done( null, JSON.parse( id ));
 });
 
-app.use(cookieParser());
-app.use(bodyParser.urlencoded({extended: false}));
-app.use(session({
+// ORDER OF THESE MIDDLEWARE MATTERS...
+// 'cookieParser', 'bodyParser', and 'session' need to come before 'passport' and 'cookieParser' needs to come before 'session'
+app.use( cookieParser() );
+app.use( bodyParser.urlencoded( {extended: false} ) );
+app.use( session( {
   secret: 'bananas',
   resave: true,
   saveUninitialized: true
 }));
 
-app.use(passport.initialize());
+// Initialize Passport
+app.use( passport.initialize());
+
+// Tell passprt to handle sessions
 app.use(passport.session());
 
-app.post('/login', passport.authenticate('local'),
-function(req, res) {
-  res.end('login successful: ' + req.user.username );
+// This is when the user can authenticate
+app.post( '/login', passport.authenticate( 'local' ),
+function( req, res ) {
+  res.end( 'login successful: ' + req.user.username );
 });
 
-app.get('/secret', function(req, res) {
-  if(!req.isAuthenticated()) {
-    res.redirect('/login');
+app.get( '/secret', function( req, res ) {
+  if( !req.isAuthenticated() ) {
+    res.redirect( '/login' );
     return;
   }
-  res.end('Top secret!!!');
+  res.end( 'Top secret!!!' );
 });
 
-app.post('/register', function (req, res){
-  api.login.create(req.body.username, req.body.password)
-  .then(function(results) {
-    res.end('Register successful: ' + req.body.username);
+app.post( '/register', function ( req, res ){
+  api.login.create( req.body.username, req.body.password )
+  .then( function( results ) {
+    res.end( 'Register successful: ' + req.body.username );
   })
-  .catch(function(error){
+  .catch( function( error ){
     res.statusCode = 409;
-    res.send(error);
+    res.send( error );
   });
 });
 
-
-app.use(logger('dev'));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
-
-app.use('/', routes);
-app.use('/users', users);
-
-// catch 404 and forward to error handler
-app.use(function(req, res, next) {
-  var err = new Error('Not Found');
-  err.status = 404;
-  next(err);
+// Removes the current session
+// After hitting this route, the user will have to login again to authenticate
+app.post( '/logout', function ( req, res ) {
+  req.logout();
+  res.end( 'You\'ve been logged out.' );
 });
 
-// error handlers
-
-// development error handler
-// will print stacktrace
-if (app.get('env') === 'development') {
-  app.use(function(err, req, res, next) {
-    res.status(err.status || 500);
-    res.render('error', {
-      message: err.message,
-      error: err
-    });
-  });
-}
-
-// production error handler
-// no stacktraces leaked to user
-app.use(function(err, req, res, next) {
-  res.status(err.status || 500);
-  res.render('error', {
-    message: err.message,
-    error: {}
-  });
-});
-
-
-module.exports = app;
+app.listen(8080);
