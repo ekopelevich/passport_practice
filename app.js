@@ -15,7 +15,57 @@ var api = require('./api');
 
 var app = express();
 
-passprt.use(new LocalStrategy(function(username, password)))
+passport.use(new LocalStrategy(function(username, password, done) {
+  api.login.read( username, password )
+  .then(function (results) {
+      done(null, results.rows[0]);
+    }).catch(function (error) {
+    done(error);
+  });
+}));
+
+passport.serializeUser(function (user, done) {
+  done(null, JSON.stringify(user));
+});
+
+passport.deserializer(function (id, done) {
+  done(null, JSON.parse(id));
+});
+
+app.use(cookieParser());
+app.use(bodyParser.urlencoded({extended: false}));
+app.use(session({
+  secret: 'bananas',
+  resave: true,
+  saveUninitialized: true
+}));
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+app.post('/login', passport.authenticate('local'),
+function(req, res) {
+  res.end('login successful: ' + req.user.username );
+});
+
+app.get('/secret', function(req, res) {
+  if(!req.isAuthenticated()) {
+    res.redirect('/login');
+    return;
+  }
+  res.end('Top secret!!!');
+});
+
+app.post('/register', function (req, res){
+  api.login.create(req.body.username, req.body.password)
+  .then(function(results) {
+    res.end('Register successful: ' + req.body.username);
+  })
+  .catch(function(error){
+    res.statusCode = 409;
+    res.send(error);
+  });
+});
 
 
 app.use(logger('dev'));
