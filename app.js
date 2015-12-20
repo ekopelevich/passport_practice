@@ -32,7 +32,7 @@ passport.serializeUser( function ( user, done ) {
 
 // Client gives  server a cookie that was created with serializeUser
 // Deserialize will unencrypt the cookie string and retrieve the user
-passport.deserializer( function ( id, done ) {
+passport.deserializeUser( function ( id, done ) {
   done( null, JSON.parse( id ));
 });
 
@@ -84,4 +84,6 @@ app.post( '/logout', function ( req, res ) {
   res.end( 'You\'ve been logged out.' );
 });
 
-app.listen(8080);
+app.listen(8080, function() {
+  console.log('Listening on port 8080');
+});
