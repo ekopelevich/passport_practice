@@ -1,16 +1,22 @@
-var express = require('express');
+var express = require( 'express' );
 
 // Express Middlewares
-var cookieParser = require('cookie-parser');
-var bodyParser = require('body-parser');
-var session  = require('express-session');
-var passport = require('passport');
+var cookieParser = require( 'cookie-parser' );
+var bodyParser = require( 'body-parser' );
+var path = require( 'path' );
+var routes = require('./routes/index');
+var session  = require( 'express-session' );
+var passport = require( 'passport' );
 
 // Passport Middlewares
-var LocalStrategy = require('passport-local');
-var api = require('./api');
+var LocalStrategy = require( 'passport-local' );
+var api = require( './api' );
 
 var app = express();
+
+// view engine setup
+app.set('views', path.join(__dirname, 'views'));
+app.set('view engine', 'jade');
 
 // Configure Passport to use localStrategy
 // Query Postgres and return error or a user object
@@ -30,12 +36,6 @@ passport.serializeUser( function ( user, done ) {
   done( null, JSON.stringify( user ));
 });
 
-// Client gives  server a cookie that was created with serializeUser
-// Deserialize will unencrypt the cookie string and retrieve the user
-passport.deserializeUser( function ( id, done ) {
-  done( null, JSON.parse( id ));
-});
-
 // ORDER OF THESE MIDDLEWARE MATTERS...
 // 'cookieParser', 'bodyParser', and 'session' need to come before 'passport' and 'cookieParser' needs to come before 'session'
 app.use( cookieParser() );
@@ -45,12 +45,20 @@ app.use( session( {
   resave: true,
   saveUninitialized: true
 }));
+app.use( express.static(path.join(__dirname, 'public')));
+app.use( '/', routes );
 
 // Initialize Passport
 app.use( passport.initialize());
 
 // Tell passprt to handle sessions
 app.use(passport.session());
+
+// Client gives  server a cookie that was created with serializeUser
+// Deserialize will unencrypt the cookie string and retrieve the user
+passport.deserializeUser( function ( id, done ) {
+  done( null, JSON.parse( id ));
+});
 
 // This is when the user can authenticate
 app.post( '/login', passport.authenticate( 'local' ),
@@ -84,6 +92,32 @@ app.post( '/logout', function ( req, res ) {
   res.end( 'You\'ve been logged out.' );
 });
 
-app.listen(8080, function() {
-  console.log('Listening on port 8080');
+// error handlers
+
+// development error handler
+// will print stacktrace
+if ( app.get( 'env' ) === 'development' ) {
+  app.use(function(err, req, res, next ) {
+    res.status( err.status || 500 );
+    res.render( 'error', {
+      message: err.message,
+      error: err
+    });
+  });
+}
+
+// production error handler
+// no stacktraces leaked to user
+app.use( function( err, req, res, next ) {
+  res.status( err.status || 500 );
+  res.render( 'error', {
+    message: err.message,
+    error: {}
+  });
 });
+
+module.exports = app;
+
+// app.listen(8080, function() {
+//   console.log('Listening on port 8080');
+// });
